@@ -1,0 +1,73 @@
+# =============================================================
+# Kubernetes 部署文件：fyh-k8s-docker-hub-demo
+# 镜像来源：https://hub.docker.com/r/ffyyhh995511/fyh-k8s-docker-hub-demo
+# 内容：Deployment(2副本) + Service(NodePort)
+# 使用：kubectl apply -f fyh-k8s-demo-deploy.yaml
+# =============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fyh-k8s-demo
+  namespace: default
+  labels:
+    app: fyh-k8s-demo
+spec:
+  # 部署 2 个容器（2 个 Pod 副本）
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fyh-k8s-demo
+  template:
+    metadata:
+      labels:
+        app: fyh-k8s-demo
+    spec:
+      containers:
+        - name: fyh-k8s-demo
+          # 镜像版本 tag（已按你的实际版本设为 1.0.0）
+          image: ffyyhh995511/fyh-k8s-docker-hub-demo:1.0.0
+          # latest 建议 Always；固定版本号可用 IfNotPresent
+          imagePullPolicy: Always
+          ports:
+            # 应用真实监听端口为 9981
+            - name: http
+              containerPort: 9981
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          # 健康检查：若应用没有 /actuator/health 接口，请删掉下面两段探针
+          # readinessProbe:
+          #   httpGet:
+          #     path: /actuator/health
+          #     port: 9981
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 10
+          # livenessProbe:
+          #   httpGet:
+          #     path: /actuator/health
+          #     port: 9981
+          #   initialDelaySeconds: 40
+          #   periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fyh-k8s-demo-service
+  namespace: default
+  labels:
+    app: fyh-k8s-demo
+spec:
+  type: NodePort
+  selector:
+    app: fyh-k8s-demo        # 必须与 Deployment 中 Pod 的 label 一致
+  ports:
+    - name: http
+      port: 9981             # Service 集群内访问端口
+      targetPort: 9981       # 容器真实监听端口
+      nodePort: 30080        # 外部访问端口，范围 30000-32767
