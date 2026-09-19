@@ -1,3 +1,5 @@
+# Deployment：声明要跑几个 Pod、用哪张镜像。Pod 挂了会按这里的配置自动重建。
+# 它不负责对外访问，访问入口在下面的 Service。
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,31 +7,41 @@ metadata:
   labels:
     app: fyh-k8s-docker-hub-demo
 spec:
+  # 保持 1 个 Pod。改成 2 就会同时跑两个实例。
   replicas: 1
+  # 用这个标签找到自己创建出来的 Pod。
   selector:
     matchLabels:
       app: fyh-k8s-docker-hub-demo
   template:
     metadata:
+      # Pod 上的标签。必须和上面的 selector、以及 Service 的 selector 一致。
       labels:
         app: fyh-k8s-docker-hub-demo
     spec:
       containers:
         - name: app
+          # Docker Hub 上的镜像。先 docker push，集群才能拉到。
           image: ffyyhh995511/fyh-k8s-docker-hub-demo:1.0.0
+          # 本机已有该镜像就直接用；部署到别的机器时建议改成 Always。
           imagePullPolicy: IfNotPresent
           ports:
+            # 容器里 Java 进程监听的端口，对应 application.yml 的 server.port。
             - containerPort: 9981
 ---
+# Service：按标签找到 Pod，提供一个不变的访问入口。
+# type 为 NodePort 时，每个节点都会额外打开 nodePort。
 apiVersion: v1
 kind: Service
 metadata:
   name: fyh-k8s-docker-hub-demo
 spec:
+  # NodePort：集群外用「节点IP:nodePort」访问。
   type: NodePort
+  # 必须和 Pod 的标签一致，否则流量找不到 Pod。
   selector:
     app: fyh-k8s-docker-hub-demo
   ports:
-    - port: 9981
-      targetPort: 9981
-      nodePort: 30981
+    - port: 9981           # 集群内部访问 Service 的端口
+      targetPort: 9981    # 转到容器真实监听端口，须与 containerPort 一致
+      nodePort: 30080     # 写死。每个节点对外端口，合法范围 30000-32767
